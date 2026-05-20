@@ -12,13 +12,17 @@ LOG_FILE="$PROJECT_DIR/.claude/debugging_log.md"
 ERRORS_TMP="$PROJECT_DIR/.claude/session_errors.tmp"
 CONFIG_FILE="$PROJECT_DIR/.claude/config"
 
-ERROR_THRESHOLD=2
-CHECK_TIMEOUT_SECS=45
-CHECK_OUTPUT_LINES=40
+ERROR_THRESHOLD_DEFAULT=2
+CHECK_TIMEOUT_SECS_DEFAULT=45
+CHECK_OUTPUT_LINES_DEFAULT=40
 [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
-THRESHOLD_TRIGGER="${ERROR_THRESHOLD:-${TS_ERROR_THRESHOLD:-2}}"
-CHECK_TIMEOUT_SECS="${CHECK_TIMEOUT_SECS:-45}"
-CHECK_OUTPUT_LINES="${CHECK_OUTPUT_LINES:-40}"
+if [[ -z "${ERROR_THRESHOLD+x}" && -n "${TS_ERROR_THRESHOLD+x}" ]]; then
+  ERROR_THRESHOLD="$TS_ERROR_THRESHOLD"
+fi
+ERROR_THRESHOLD="${ERROR_THRESHOLD:-$ERROR_THRESHOLD_DEFAULT}"
+CHECK_TIMEOUT_SECS="${CHECK_TIMEOUT_SECS:-$CHECK_TIMEOUT_SECS_DEFAULT}"
+CHECK_OUTPUT_LINES="${CHECK_OUTPUT_LINES:-$CHECK_OUTPUT_LINES_DEFAULT}"
+THRESHOLD_TRIGGER="$ERROR_THRESHOLD"
 if [[ -z "${CHECK_DEFINITIONS+x}" ]]; then
   CHECK_DEFINITIONS=()
 fi
@@ -53,6 +57,14 @@ find_root() {
   echo ""
 }
 
+count_errors() {
+  local codes="$1"
+  local count
+  count=$(echo "$codes" | wc -w | tr -d ' ')
+  [[ "$count" -eq 0 ]] && count=1
+  echo "$count"
+}
+
 declare -A CHECK_SEEN=()
 
 if [[ -n "$MODIFIED_FILES" && ${#CHECK_DEFINITIONS[@]} -gt 0 ]]; then
@@ -71,7 +83,7 @@ if [[ -n "$MODIFIED_FILES" && ${#CHECK_DEFINITIONS[@]} -gt 0 ]]; then
           continue
         fi
         CHECK_KEY_RAW="${CHECK_NAME}|${ROOT}"
-        CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sed 's/[\/|]/_/g')"
+        CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sed 's|[/|]|_|g')"
         [[ -n "${CHECK_SEEN[$CHECK_KEY]:-}" ]] && continue
         CHECK_SEEN["$CHECK_KEY"]=1
 
@@ -83,8 +95,7 @@ if [[ -n "$MODIFIED_FILES" && ${#CHECK_DEFINITIONS[@]} -gt 0 ]]; then
         fi
 
         if [[ -n "$RESULT" ]]; then
-          ERROR_COUNT=$(echo "$ERROR_CODES" | wc -w | tr -d ' ')
-          [[ "$ERROR_COUNT" -eq 0 ]] && ERROR_COUNT=1
+          ERROR_COUNT=$(count_errors "$ERROR_CODES")
           CHECK_ERRORS="$CHECK_ERRORS
 ### Verification — $CHECK_NAME ($(basename "$ROOT"))
 **Root:** $ROOT

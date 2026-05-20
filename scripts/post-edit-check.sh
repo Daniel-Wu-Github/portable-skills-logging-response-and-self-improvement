@@ -55,6 +55,14 @@ find_root() {
   echo ""
 }
 
+count_errors() {
+  local codes="$1"
+  local count
+  count=$(echo "$codes" | wc -w | tr -d ' ')
+  [[ "$count" -eq 0 ]] && count=1
+  echo "$count"
+}
+
 [[ ${#CHECK_DEFINITIONS[@]} -eq 0 ]] && exit 0
 
 MATCHED=false
@@ -72,7 +80,7 @@ for def in "${CHECK_DEFINITIONS[@]}"; do
     fi
 
     CHECK_KEY_RAW="${CHECK_NAME}|${ROOT}"
-    CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sed 's/[\/|]/_/g')"
+    CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sed 's|[/|]|_|g')"
 
     NOW=$(date +%s)
     LAST_CHECK=0
@@ -115,8 +123,7 @@ for def in "${CHECK_DEFINITIONS[@]}"; do
       echo ""
     } >> "$ERRORS_TMP"
 
-    ERROR_COUNT=$(echo "$ERROR_CODES" | wc -w | tr -d ' ')
-    [[ "$ERROR_COUNT" -eq 0 ]] && ERROR_COUNT=1
+    ERROR_COUNT=$(count_errors "$ERROR_CODES")
     bash "$PROJECT_DIR/scripts/notify.sh" \
       "$CHECK_NAME: $ERROR_COUNT error(s) after editing $(basename "$FILE")" \
       "Claude Code — Verification Error" "high" "x,claude" 2>/dev/null || true

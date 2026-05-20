@@ -9,9 +9,10 @@ Inline entries are written manually using the template below.
 
 ## How to Read This Log
 
-- **Session End** entries: auto-written on every Stop, captures TypeScript errors and skill-improvement flags
+- **Session End** entries: auto-written on every Stop, captures verification errors and skill-improvement flags
 - **Debug Entry** entries: structured records of specific bugs — what symptom, what root cause, which skill missed it
 - **Pattern Flag** entries: written when the same error type appears 2+ times — triggers `skill-improvement-loop`
+- **Verification blocks:** include `ERROR_CODE:` or `CHECK_ERROR:` lines used by pattern analysis
 
 ---
 

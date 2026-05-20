@@ -15,7 +15,7 @@ SMOKE_SCRIPT="$PROJECT_DIR/scripts/implicit-skill-smoke-test.sh"
 CONFIG_FILE="$PROJECT_DIR/.claude/config"
 
 # ─── Load config ──────────────────────────────────────────────────────────────
-PATTERN_TS_ERROR_MIN=2
+PATTERN_ERROR_CODE_MIN=2
 PATTERN_FILE_ERROR_MIN=3
 SKILL_GAP_ESCALATE_MIN=2
 SMOKE_FAIL_NOTIFY_PRIORITY=high
@@ -26,20 +26,20 @@ mkdir -p "$PROJECT_DIR/.claude"
 FOUND_ITEMS=false
 NOW="$(date -u +%Y-%m-%d)"
 
-# ─── 1. TypeScript error code frequency ───────────────────────────────────────
+# ─── 1. Error code frequency ──────────────────────────────────────────────────
 declare -A ERROR_COUNTS=()
 if [[ -f "$LOG_FILE" ]]; then
   while IFS= read -r code; do
     [[ -z "$code" ]] && continue
     ERROR_COUNTS["$code"]=$(( ${ERROR_COUNTS[$code]:-0} + 1 ))
-  done < <(grep -oE 'TS[0-9]{4}' "$LOG_FILE" 2>/dev/null | sort || true)
+  done < <(awk -F': ' '/^ERROR_CODE: / {print $2}' "$LOG_FILE" 2>/dev/null | sort || true)
 fi
 
 if [[ -f "$ERRORS_TMP" ]]; then
   while IFS= read -r code; do
     [[ -z "$code" ]] && continue
     ERROR_COUNTS["$code"]=$(( ${ERROR_COUNTS[$code]:-0} + 1 ))
-  done < <(grep -oE 'TS[0-9]{4}' "$ERRORS_TMP" 2>/dev/null | sort || true)
+  done < <(awk -F': ' '/^ERROR_CODE: / {print $2}' "$ERRORS_TMP" 2>/dev/null | sort || true)
 fi
 
 # ─── 2. Hot file detection ────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ if [[ -f "$LOG_FILE" ]]; then
   while IFS= read -r fname; do
     [[ -z "$fname" ]] && continue
     FILE_COUNTS["$fname"]=$(( ${FILE_COUNTS[$fname]:-0} + 1 ))
-  done < <(grep -oE '[a-zA-Z0-9_/-]+\.(ts|tsx)' "$LOG_FILE" 2>/dev/null | sort || true)
+  done < <(grep -oE '[a-zA-Z0-9_/-]+\.[a-zA-Z0-9]{1,6}' "$LOG_FILE" 2>/dev/null | sort || true)
 fi
 
 # ─── 3. Skill gap detection from structured Debug Entry blocks ────────────────
@@ -78,7 +78,7 @@ fi
 # ─── 5. Build findings ────────────────────────────────────────────────────────
 RECURRING_ERRORS=""
 for code in "${!ERROR_COUNTS[@]}"; do
-  [[ ${ERROR_COUNTS[$code]} -ge $PATTERN_TS_ERROR_MIN ]] && {
+  [[ ${ERROR_COUNTS[$code]} -ge ${PATTERN_ERROR_CODE_MIN:-2} ]] && {
     RECURRING_ERRORS="$RECURRING_ERRORS\n- **$code** — ${ERROR_COUNTS[$code]}x in log"
     FOUND_ITEMS=true
   }
@@ -120,7 +120,7 @@ fi
   echo ""
 
   if [[ -n "$RECURRING_ERRORS" ]]; then
-    echo "### Recurring TypeScript Errors"
+    echo "### Recurring Error Codes"
     echo -e "$RECURRING_ERRORS"
     echo ""
     echo "**Action:** Look up each error code in \`.claude/debugging_log.md\`."
@@ -171,7 +171,7 @@ fi
 
 # ─── 7. Notify ────────────────────────────────────────────────────────────────
 SUMMARY=""
-[[ -n "$RECURRING_ERRORS" ]] && SUMMARY="Recurring TS errors. "
+[[ -n "$RECURRING_ERRORS" ]] && SUMMARY="Recurring error codes. "
 [[ -n "$SKILL_GAP_ITEMS" ]] && SUMMARY="${SUMMARY}Skill gaps detected. "
 [[ $SMOKE_FAILURES -gt 0 ]] && SUMMARY="${SUMMARY}${SMOKE_FAILURES} smoke test failure(s)."
 

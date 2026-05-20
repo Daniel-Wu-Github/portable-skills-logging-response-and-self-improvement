@@ -64,7 +64,7 @@ count_errors() {
     return
   fi
   local count
-  count=$(echo "$codes" | wc -w | tr -d ' ')
+  count=$(echo "$codes" | tr ' ' '\n' | grep -E '.+' | sort -u | wc -l | tr -d ' ')
   [[ "$count" -eq 0 ]] && count=1
   echo "$count"
 }
@@ -76,7 +76,16 @@ if [[ -n "$MODIFIED_FILES" && ${#CHECK_DEFINITIONS[@]} -gt 0 ]]; then
     [[ -z "$changed_file" ]] && continue
     full_path="$PROJECT_DIR/$changed_file"
     for def in "${CHECK_DEFINITIONS[@]}"; do
-      IFS='|' read -r CHECK_NAME FILE_REGEX ROOT_MARKER COMMAND ERROR_REGEX <<< "$def"
+      IFS='|' read -r -a CHECK_PARTS <<< "$def"
+      if [[ ${#CHECK_PARTS[@]} -ne 5 ]]; then
+        echo "⚠️  SESSION END: invalid check definition (expected 5 fields): $def"
+        continue
+      fi
+      CHECK_NAME="${CHECK_PARTS[0]}"
+      FILE_REGEX="${CHECK_PARTS[1]}"
+      ROOT_MARKER="${CHECK_PARTS[2]}"
+      COMMAND="${CHECK_PARTS[3]}"
+      ERROR_REGEX="${CHECK_PARTS[4]}"
       [[ -z "$CHECK_NAME" || -z "$FILE_REGEX" || -z "$COMMAND" ]] && continue
       if [[ "$full_path" =~ $FILE_REGEX ]]; then
         ROOT="$(find_root "$ROOT_MARKER" "$(dirname "$full_path")")"
@@ -87,7 +96,7 @@ if [[ -n "$MODIFIED_FILES" && ${#CHECK_DEFINITIONS[@]} -gt 0 ]]; then
           continue
         fi
         CHECK_KEY_RAW="${CHECK_NAME}|${ROOT}"
-        CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | tr '/|' '_')"
+        CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sha256sum | cut -d' ' -f1)"
         [[ -n "${CHECK_SEEN[$CHECK_KEY]:-}" ]] && continue
         CHECK_SEEN["$CHECK_KEY"]=1
 

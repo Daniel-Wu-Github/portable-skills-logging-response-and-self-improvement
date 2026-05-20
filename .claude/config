@@ -5,7 +5,8 @@
 # ── Verification checks (language-agnostic) ────────────────────────────────────
 # Each entry: name|file_regex|root_marker|command|error_code_regex
 # - file_regex: bash regex matched against the edited/modified file path
-#   (double-escape backslashes inside the quoted string)
+#   (double-escape backslashes inside the quoted string, e.g. \\.tsx?$)
+# - fields are pipe-delimited; avoid literal `|` in regex or commands
 # - root_marker: search upward for this file; use "project" to force repo root
 # - error_code_regex: optional; pattern used to extract error codes for trends
 CHECK_DEFINITIONS=(

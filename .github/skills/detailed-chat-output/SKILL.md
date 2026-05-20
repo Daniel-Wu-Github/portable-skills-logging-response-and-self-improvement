@@ -12,7 +12,7 @@ Use it whenever you are documenting verification steps, outcome reporting, high-
 
 ## When Not to Use
 
-No exclusions. This skill is mandatory for all tasks.
+N/A — this skill is always required.
 
 ## Files and Surfaces
 

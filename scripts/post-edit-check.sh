@@ -57,6 +57,10 @@ find_root() {
 
 count_errors() {
   local codes="$1"
+  if [[ -z "$codes" ]]; then
+    echo 1
+    return
+  fi
   local count
   count=$(echo "$codes" | wc -w | tr -d ' ')
   [[ "$count" -eq 0 ]] && count=1
@@ -80,7 +84,7 @@ for def in "${CHECK_DEFINITIONS[@]}"; do
     fi
 
     CHECK_KEY_RAW="${CHECK_NAME}|${ROOT}"
-    CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sed 's|[/|]|_|g')"
+    CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | tr '/|' '_')"
 
     NOW=$(date +%s)
     LAST_CHECK=0

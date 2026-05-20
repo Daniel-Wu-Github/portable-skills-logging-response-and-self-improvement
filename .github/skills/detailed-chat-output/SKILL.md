@@ -8,7 +8,7 @@ description: "Mandatory output formatting for every task to keep responses struc
 ## When to Use
 
 Use this skill on every task, including one-line confirmations, planning-only requests, and implementation work.
-Use it whenever you are documenting verification steps, outcome reporting, high-risk refactors, or other multi-step changes.
+This applies to all tasks and is especially relevant when documenting verification steps, outcome reporting, high-risk refactors, or other multi-step changes.
 
 ## When Not to Use
 

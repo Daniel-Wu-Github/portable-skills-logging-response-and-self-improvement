@@ -64,7 +64,12 @@ for def in "${CHECK_DEFINITIONS[@]}"; do
   if [[ "$FILE" =~ $FILE_REGEX ]]; then
     MATCHED=true
     ROOT="$(find_root "$ROOT_MARKER" "$(dirname "$FILE")")"
-    [[ -z "$ROOT" ]] && continue
+    if [[ -z "$ROOT" ]]; then
+      if [[ -n "$ROOT_MARKER" && "$ROOT_MARKER" != "project" ]]; then
+        echo "ℹ️  POST-EDIT: $CHECK_NAME skipped (no $ROOT_MARKER found for $(basename "$FILE"))"
+      fi
+      continue
+    fi
 
     CHECK_KEY_RAW="${CHECK_NAME}|${ROOT}"
     CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sed 's/[\/|]/_/g')"

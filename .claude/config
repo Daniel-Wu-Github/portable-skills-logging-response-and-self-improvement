@@ -19,6 +19,7 @@ CHECK_OUTPUT_LINES=40
 # session-end.sh: total verification errors per session that trigger the
 # skill-improvement-loop flag
 ERROR_THRESHOLD=2
+# Deprecated: TS_ERROR_THRESHOLD is still read for backward compatibility.
 
 # post-edit-check.sh: minimum seconds between checks for the same root+check
 # Lower = faster feedback, higher CPU cost. Raise to 60+ for slow machines.

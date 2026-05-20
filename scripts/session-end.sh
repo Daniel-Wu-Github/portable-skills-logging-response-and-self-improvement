@@ -64,7 +64,12 @@ if [[ -n "$MODIFIED_FILES" && ${#CHECK_DEFINITIONS[@]} -gt 0 ]]; then
       [[ -z "$CHECK_NAME" || -z "$FILE_REGEX" || -z "$COMMAND" ]] && continue
       if [[ "$full_path" =~ $FILE_REGEX ]]; then
         ROOT="$(find_root "$ROOT_MARKER" "$(dirname "$full_path")")"
-        [[ -z "$ROOT" ]] && continue
+        if [[ -z "$ROOT" ]]; then
+          if [[ -n "$ROOT_MARKER" && "$ROOT_MARKER" != "project" ]]; then
+            echo "ℹ️  SESSION END: $CHECK_NAME skipped (no $ROOT_MARKER found for $changed_file)"
+          fi
+          continue
+        fi
         CHECK_KEY_RAW="${CHECK_NAME}|${ROOT}"
         CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sed 's/[\/|]/_/g')"
         [[ -n "${CHECK_SEEN[$CHECK_KEY]:-}" ]] && continue

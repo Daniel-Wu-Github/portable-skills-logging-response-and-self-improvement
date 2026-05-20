@@ -16,6 +16,7 @@ These instructions are always-on for work in this repository.
 
 - Research and plan before implementation.
 - Load `.github/skills/scope-creep-guard/SKILL.md` for every task before planning or edits and enforce its boundary checks.
+- Load `.github/skills/detailed-chat-output/SKILL.md` for every task before planning or edits and follow its output rules.
 - Execute in small verifiable steps and iterate until the task is fully complete.
 - Use additional sessions when necessary; do not stop at partial completion.
 - Compact conversation context whenever context usage exceeds about 65 percent during long-running iteration.

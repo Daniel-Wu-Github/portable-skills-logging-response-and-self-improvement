@@ -2,8 +2,8 @@
 
 A drop-in skill system for Claude Code and GitHub Copilot that provides:
 - **11 reusable skills** for scope control, documentation, testing, verification, logging, and self-improvement
-- **Automatic TypeScript error checking** after every edit (PostToolUse hook)
-- **Session-end reporting** with skill-improvement auto-flagging (Stop hook)
+- **Automatic verification checks** after every edit (configurable per language)
+- **Session-end reporting** with verification summaries and skill-improvement auto-flagging
 - **Push notifications** via ntfy.sh when Claude needs approval or finishes working
 - **Commit log automation** via a pre-push git hook
 - **Pattern analysis** that surfaces recurring errors and skill gaps across sessions
@@ -44,9 +44,9 @@ chmod +x scripts/*.sh .githooks/pre-commit .githooks/pre-push
 git config core.hooksPath .githooks
 ```
 
-### 5. Customize CLAUDE.md for your project
+### 5. Customize agent context for your project
 
-Open `CLAUDE.md` and fill in the **Project-Specific Instructions** section at the bottom:
+Open `CLAUDE.md`, `GEMINI.md`, and `context.md`, then fill in the **Project-Specific Instructions** (or placeholders) at the bottom:
 - Core mission and project philosophy
 - Architecture guardrails
 - Sources of truth (canonical docs)
@@ -70,13 +70,13 @@ Do the same for `.github/copilot-instructions.md`.
     verification-gate/          — enforces verification before completion
     workflow-logging/           — captures material decisions and changes
     remote-commit-logging/      — automates commit history via pre-push hook
-    detailed-chat-output/       — structures responses for traceability
+    detailed-chat-output/       — structures responses for traceability (mandatory every task)
     self-improvement-loop/      — fixes recurring mistakes and stale docs
     skill-improvement-loop/     — evaluates and rewrites skills with trigger gaps
     repo-workflow/              — manages instruction files and workflow surfaces
 .claude/
-  settings.json                 — hooks: PostToolUse (tsc), Stop (session-end), Notification
-  config                        — tunable thresholds (error count, rate limits)
+  settings.json                 — hooks: PostToolUse (checks), Stop (session-end), Notification
+  config                        — tunable thresholds and check definitions
   debugging_log.md              — persistent error and skill gap record
   pending-improvements.md       — auto-populated action queue (checked at session start)
 .githooks/
@@ -85,8 +85,8 @@ Do the same for `.github/copilot-instructions.md`.
 scripts/
   notify.sh                     — ntfy.sh push notifications
   notify-approval.sh            — Notification hook (approval needed)
-  post-edit-check.sh            — PostToolUse hook (TypeScript error check)
-  session-end.sh                — Stop hook (TS check + pattern analysis + notify)
+  post-edit-check.sh            — PostToolUse hook (verification checks)
+  session-end.sh                — Stop hook (checks + pattern analysis + notify)
   analyze-patterns.sh           — scans log for recurring errors and skill gaps
   update-skill-memory.sh        — updates memory/ files from debug log entries
   implicit-skill-smoke-test.sh  — validates skill auto-loading with golden prompts
@@ -97,6 +97,8 @@ memory/
   skill_effectiveness.md        — per-skill scores and miss counts
   debugging_patterns.md         — recurring root cause patterns
 CLAUDE.md                       — Claude Code instructions (customize Project-Specific section)
+GEMINI.md                       — Gemini agent context template
+context.md                      — shared project context template
 ```
 
 ---
@@ -119,9 +121,9 @@ CLAUDE.md                       — Claude Code instructions (customize Project-
 
 ## How the Self-Improvement Loop Works
 
-1. **Every edit to a `.ts` file** → `post-edit-check.sh` runs tsc, sends notification on error.
-2. **Every session end** → `session-end.sh` checks modified packages, appends to `debugging_log.md`, runs `analyze-patterns.sh`.
-3. **`analyze-patterns.sh`** → surfaces recurring TS error codes, hot files, and skill gap entries into `pending-improvements.md`.
+1. **Every edit to a matching file** → `post-edit-check.sh` runs configured checks, sends notification on error.
+2. **Every session end** → `session-end.sh` runs configured checks for modified files, appends to `debugging_log.md`, runs `analyze-patterns.sh`.
+3. **`analyze-patterns.sh`** → surfaces recurring error codes, hot files, and skill gap entries into `pending-improvements.md`.
 4. **Session start** → Claude reads `pending-improvements.md` first and resolves flagged items before any task.
 5. **2+ skill gap mentions** → `skill-improvement-loop` is auto-flagged, Claude rewrites the skill, runs smoke test.
 

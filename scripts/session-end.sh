@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # session-end.sh
 # Runs after each Claude Code session (Stop hook).
-# 1. Detects TypeScript packages containing modified files and runs tsc
+# 1. Runs configured verification checks for modified files
 # 2. Appends a structured session boundary to the debugging log
 # 3. Flags skill-improvement-loop if error threshold is exceeded
 
@@ -12,65 +12,131 @@ LOG_FILE="$PROJECT_DIR/.claude/debugging_log.md"
 ERRORS_TMP="$PROJECT_DIR/.claude/session_errors.tmp"
 CONFIG_FILE="$PROJECT_DIR/.claude/config"
 
-TS_ERROR_THRESHOLD=2
+ERROR_THRESHOLD=2
+CHECK_TIMEOUT_SECS=45
+CHECK_OUTPUT_LINES=40
 [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
-THRESHOLD_TRIGGER="${TS_ERROR_THRESHOLD}"
+THRESHOLD_TRIGGER="${ERROR_THRESHOLD:-${TS_ERROR_THRESHOLD:-2}}"
+CHECK_TIMEOUT_SECS="${CHECK_TIMEOUT_SECS:-45}"
+CHECK_OUTPUT_LINES="${CHECK_OUTPUT_LINES:-40}"
+if [[ -z "${CHECK_DEFINITIONS+x}" ]]; then
+  CHECK_DEFINITIONS=()
+fi
 
 mkdir -p "$PROJECT_DIR/.claude"
 
 SESSION_DATE="$(date -u +%Y-%m-%d)"
 SESSION_TIME="$(date -u +%H:%M:%SZ)"
-TS_ERRORS=""
+CHECK_ERRORS=""
+CHECK_BLOCKS=""
+CHECKS_RUN=0
 SKILL_FLAG=false
 
-# ─── 1. TypeScript Verification ──────────────────────────────────────────────
-MODIFIED_TS="$(cd "$PROJECT_DIR" && git diff --name-only HEAD 2>/dev/null | grep '\.ts$' || true)"
+# ─── 1. Verification checks ──────────────────────────────────────────────────
+MODIFIED_FILES="$(cd "$PROJECT_DIR" && git diff --name-only HEAD 2>/dev/null || true)"
 
-if [[ -n "$MODIFIED_TS" ]]; then
-  # Discover unique package roots from modified .ts files
-  declare -A PKG_SEEN=()
-  while IFS= read -r ts_file; do
-    [[ -z "$ts_file" ]] && continue
-    full_path="$PROJECT_DIR/$ts_file"
-    search_dir="$(dirname "$full_path")"
-    pkg_dir=""
-    while [[ "$search_dir" != "/" ]]; do
-      if [[ -f "$search_dir/tsconfig.json" ]]; then
-        pkg_dir="$search_dir"
-        break
-      fi
-      [[ "$search_dir" == "$PROJECT_DIR" ]] && break
-      search_dir="$(dirname "$search_dir")"
-    done
-    # Also check project root
-    if [[ -z "$pkg_dir" && -f "$PROJECT_DIR/tsconfig.json" ]]; then
-      pkg_dir="$PROJECT_DIR"
+find_root() {
+  local marker="$1"
+  local search_dir="$2"
+  if [[ -z "$marker" || "$marker" == "project" ]]; then
+    echo "$PROJECT_DIR"
+    return
+  fi
+  while [[ "$search_dir" != "/" && "$search_dir" != "." ]]; do
+    if [[ -f "$search_dir/$marker" ]]; then
+      echo "$search_dir"
+      return
     fi
-    [[ -z "$pkg_dir" ]] && continue
-    [[ -n "${PKG_SEEN[$pkg_dir]:-}" ]] && continue
-    PKG_SEEN["$pkg_dir"]=1
+    [[ "$search_dir" == "$PROJECT_DIR" ]] && break
+    search_dir="$(dirname "$search_dir")"
+  done
+  echo ""
+}
 
-    PKG_NAME="$(basename "$pkg_dir")"
-    PKG_ERRORS="$(cd "$pkg_dir" && npx tsc --noEmit 2>&1 | head -40 || true)"
-    if [[ -n "$PKG_ERRORS" ]]; then
-      TS_ERRORS="$TS_ERRORS
-### TypeScript Errors ($PKG_NAME)
+declare -A CHECK_SEEN=()
+
+if [[ -n "$MODIFIED_FILES" && ${#CHECK_DEFINITIONS[@]} -gt 0 ]]; then
+  while IFS= read -r changed_file; do
+    [[ -z "$changed_file" ]] && continue
+    full_path="$PROJECT_DIR/$changed_file"
+    for def in "${CHECK_DEFINITIONS[@]}"; do
+      IFS='|' read -r CHECK_NAME FILE_REGEX ROOT_MARKER COMMAND ERROR_REGEX <<< "$def"
+      [[ -z "$CHECK_NAME" || -z "$FILE_REGEX" || -z "$COMMAND" ]] && continue
+      if [[ "$full_path" =~ $FILE_REGEX ]]; then
+        ROOT="$(find_root "$ROOT_MARKER" "$(dirname "$full_path")")"
+        [[ -z "$ROOT" ]] && continue
+        CHECK_KEY_RAW="${CHECK_NAME}|${ROOT}"
+        CHECK_KEY="$(printf '%s' "$CHECK_KEY_RAW" | sed 's/[\/|]/_/g')"
+        [[ -n "${CHECK_SEEN[$CHECK_KEY]:-}" ]] && continue
+        CHECK_SEEN["$CHECK_KEY"]=1
+
+        CHECKS_RUN=$(( CHECKS_RUN + 1 ))
+        RESULT=$(cd "$ROOT" && timeout "$CHECK_TIMEOUT_SECS" bash -c "$COMMAND" 2>&1 | head -"${CHECK_OUTPUT_LINES}" || true)
+        ERROR_CODES=""
+        if [[ -n "$ERROR_REGEX" && -n "$RESULT" ]]; then
+          ERROR_CODES=$(echo "$RESULT" | grep -oE "$ERROR_REGEX" | sort -u | tr '\n' ' ')
+        fi
+
+        if [[ -n "$RESULT" ]]; then
+          ERROR_COUNT=$(echo "$ERROR_CODES" | wc -w | tr -d ' ')
+          [[ "$ERROR_COUNT" -eq 0 ]] && ERROR_COUNT=1
+          CHECK_ERRORS="$CHECK_ERRORS
+### Verification — $CHECK_NAME ($(basename "$ROOT"))
+**Root:** $ROOT
+**Command:** $COMMAND
+**Result:** ❌ Errors found ($ERROR_COUNT)
 \`\`\`
-$PKG_ERRORS
+$RESULT
 \`\`\`"
-    fi
-  done <<< "$MODIFIED_TS"
+          if [[ -n "$ERROR_CODES" ]]; then
+            for code in $ERROR_CODES; do
+              CHECK_ERRORS="$CHECK_ERRORS
+ERROR_CODE: $code"
+            done
+          else
+            CHECK_ERRORS="$CHECK_ERRORS
+CHECK_ERROR: $CHECK_NAME"
+          fi
+
+          {
+            echo "### Check error — $CHECK_NAME — $(date -u +%H:%M:%SZ)"
+            echo "**Root:** $ROOT"
+            echo "**Command:** $COMMAND"
+            echo '```'
+            echo "$RESULT"
+            echo '```'
+            if [[ -n "$ERROR_CODES" ]]; then
+              for code in $ERROR_CODES; do
+                echo "ERROR_CODE: $code"
+              done
+            else
+              echo "CHECK_ERROR: $CHECK_NAME"
+            fi
+            echo ""
+          } >> "$ERRORS_TMP"
+        else
+          CHECK_BLOCKS="$CHECK_BLOCKS
+### Verification — $CHECK_NAME ($(basename "$ROOT"))
+**Root:** $ROOT
+**Command:** $COMMAND
+**Result:** ✅ No errors"
+        fi
+      fi
+    done
+  done <<< "$MODIFIED_FILES"
 fi
 
 # ─── 2. Count errors and decide flag ─────────────────────────────────────────
 ERROR_COUNT=0
-if [[ -n "$TS_ERRORS" ]]; then
-  ERROR_COUNT="$(echo "$TS_ERRORS" | grep -c 'error TS' || true)"
+if [[ -n "$CHECK_ERRORS" ]]; then
+  ERROR_COUNT="$(echo "$CHECK_ERRORS" | grep -c 'ERROR_CODE:' || true)"
+  [[ "$ERROR_COUNT" -eq 0 ]] && ERROR_COUNT="$(echo "$CHECK_ERRORS" | grep -c 'CHECK_ERROR:' || true)"
 fi
 
 PREV_ERROR_COUNT=0
 if [[ -f "$ERRORS_TMP" ]]; then
-  PREV_ERROR_COUNT="$(grep -c 'error TS' "$ERRORS_TMP" 2>/dev/null || true)"
+  PREV_ERROR_COUNT="$(grep -c 'ERROR_CODE:' "$ERRORS_TMP" 2>/dev/null || true)"
+  [[ "$PREV_ERROR_COUNT" -eq 0 ]] && PREV_ERROR_COUNT="$(grep -c 'CHECK_ERROR:' "$ERRORS_TMP" 2>/dev/null || true)"
 fi
 
 TOTAL_ERRORS=$(( ERROR_COUNT + PREV_ERROR_COUNT ))
@@ -83,17 +149,24 @@ TOTAL_ERRORS=$(( ERROR_COUNT + PREV_ERROR_COUNT ))
   echo "## Session End — $SESSION_DATE $SESSION_TIME"
   echo ""
 
-  if [[ -n "$MODIFIED_TS" ]]; then
-    echo "**Modified TypeScript files:**"
-    echo "$MODIFIED_TS" | sed 's/^/- /'
+  if [[ -n "$MODIFIED_FILES" ]]; then
+    echo "**Modified files:**"
+    echo "$MODIFIED_FILES" | sed 's/^/- /'
     echo ""
   fi
 
-  if [[ -n "$TS_ERRORS" ]]; then
-    echo "**Verification Result:** ❌ Errors found ($ERROR_COUNT TypeScript error(s))"
-    echo "$TS_ERRORS"
+  if [[ $CHECKS_RUN -eq 0 ]]; then
+    echo "**Verification Result:** ⚠️ No checks ran (no matching files or checks configured)"
   else
-    echo "**Verification Result:** ✅ No TypeScript errors"
+    if [[ -n "$CHECK_ERRORS" ]]; then
+      echo "**Verification Result:** ❌ Errors found ($ERROR_COUNT error(s))"
+      echo "$CHECK_ERRORS"
+    else
+      echo "**Verification Result:** ✅ No verification errors"
+    fi
+    if [[ -n "$CHECK_BLOCKS" ]]; then
+      echo "$CHECK_BLOCKS"
+    fi
   fi
 
   if [[ -f "$ERRORS_TMP" && -s "$ERRORS_TMP" ]]; then
@@ -111,20 +184,16 @@ TOTAL_ERRORS=$(( ERROR_COUNT + PREV_ERROR_COUNT ))
   echo ""
 } >> "$LOG_FILE"
 
-if [[ -n "$TS_ERRORS" ]]; then
-  echo "$TS_ERRORS" >> "$ERRORS_TMP"
-fi
-
 # ─── 4. Send ntfy.sh push notification ───────────────────────────────────────
 NOTIFY="$PROJECT_DIR/scripts/notify.sh"
 if [[ -x "$NOTIFY" ]]; then
   if $SKILL_FLAG; then
     bash "$NOTIFY" \
-      "Done — $TOTAL_ERRORS TS error(s). Run skill-improvement-loop before next task." \
+      "Done — $TOTAL_ERRORS verification error(s). Run skill-improvement-loop before next task." \
       "Claude Code" "high" "warning,claude"
-  elif [[ -n "$TS_ERRORS" ]]; then
+  elif [[ -n "$CHECK_ERRORS" ]]; then
     bash "$NOTIFY" \
-      "Done — TypeScript errors found. Check .claude/debugging_log.md" \
+      "Done — verification errors found. Check .claude/debugging_log.md" \
       "Claude Code" "default" "warning,claude"
   else
     bash "$NOTIFY" \
@@ -146,9 +215,11 @@ if [[ -x "$ANALYZE" ]]; then
 fi
 
 if $SKILL_FLAG; then
-  echo "⚠️  SESSION END: $TOTAL_ERRORS TS error(s) — skill-improvement-loop flagged"
-elif [[ -n "$TS_ERRORS" ]]; then
-  echo "⚠️  SESSION END: TypeScript errors found — check .claude/debugging_log.md"
+  echo "⚠️  SESSION END: $TOTAL_ERRORS verification error(s) — skill-improvement-loop flagged"
+elif [[ -n "$CHECK_ERRORS" ]]; then
+  echo "⚠️  SESSION END: Verification errors found — check .claude/debugging_log.md"
+elif [[ $CHECKS_RUN -eq 0 ]]; then
+  echo "⚠️  SESSION END: No verification checks ran"
 else
-  echo "✅ SESSION END: No TypeScript errors"
+  echo "✅ SESSION END: No verification errors"
 fi

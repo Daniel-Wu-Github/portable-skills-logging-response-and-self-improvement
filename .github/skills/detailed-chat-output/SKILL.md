@@ -1,17 +1,18 @@
 ---
 name: detailed-chat-output
-description: "Use when responses need structured, traceable communication for multi-step tasks and workflow updates."
+description: "Mandatory output formatting for every task to keep responses structured and traceable."
 ---
 
 # Detailed Chat Output
 
 ## When to Use
 
-Use this skill for multi-step tasks, process changes, or work that needs clear traceability for reviewers.
+Use this skill on every task, including one-line confirmations, planning-only requests, and implementation work.
+Use it whenever you are documenting verification steps, outcome reporting, high-risk refactors, or other multi-step changes.
 
 ## When Not to Use
 
-Do not use this skill for one-line confirmations or simple yes/no responses.
+Never skip this skill.
 
 ## Files and Surfaces
 

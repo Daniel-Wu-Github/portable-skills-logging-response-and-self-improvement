@@ -5,7 +5,7 @@ Checked automatically at session start via CLAUDE.md.
 
 ## How This Works
 
-- **Pattern detection:** recurring TypeScript error codes (2+ occurrences) and hot files (3+ error mentions) are surfaced here
+- **Pattern detection:** recurring error codes (2+ occurrences) and hot files (3+ error mentions) are surfaced here
 - **Skill gap detection:** failing smoke test cases and skill gap entries from debug log are listed here
 - **Your action:** review at session start, run `skill-improvement-loop` if flagged, then clear resolved items
 

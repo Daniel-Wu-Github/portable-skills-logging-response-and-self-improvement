@@ -13,16 +13,16 @@ All agents must do these steps before using or editing skills:
 1. Classify the task (domain, risk, lifecycle stage).
 2. Load [repo-workflow](repo-workflow/SKILL.md).
 3. Load [scope-creep-guard](scope-creep-guard/SKILL.md) for every task before planning or edits.
-4. For documentation maintenance, load [documentation-cohesion](documentation-cohesion/SKILL.md).
-5. For manual testing guide authoring, load [manual-testing-guides](manual-testing-guides/SKILL.md).
-6. Add cross-cutting skills as needed in this order:
+4. Load [detailed-chat-output](detailed-chat-output/SKILL.md) for every task before planning or edits.
+5. For documentation maintenance, load [documentation-cohesion](documentation-cohesion/SKILL.md).
+6. For manual testing guide authoring, load [manual-testing-guides](manual-testing-guides/SKILL.md).
+7. Add cross-cutting skills as needed in this order:
   1. [skill-map-governance](skill-map-governance/SKILL.md)
   2. [verification-gate](verification-gate/SKILL.md)
   3. [workflow-logging](workflow-logging/SKILL.md)
   4. [remote-commit-logging](remote-commit-logging/SKILL.md)
-  5. [detailed-chat-output](detailed-chat-output/SKILL.md)
-  6. [self-improvement-loop](self-improvement-loop/SKILL.md)
-  7. [skill-improvement-loop](skill-improvement-loop/SKILL.md)
+  5. [self-improvement-loop](self-improvement-loop/SKILL.md)
+  6. [skill-improvement-loop](skill-improvement-loop/SKILL.md)
 
 ## Skill Registry
 
@@ -36,7 +36,7 @@ All agents must do these steps before using or editing skills:
 | verification-gate | [verification-gate/SKILL.md](verification-gate/SKILL.md) | Enforce verification before completion | Any task that edits files, config, or process docs |
 | workflow-logging | [workflow-logging/SKILL.md](workflow-logging/SKILL.md) | Capture decisions, progress, and change records | Material process or instruction updates |
 | remote-commit-logging | [remote-commit-logging/SKILL.md](remote-commit-logging/SKILL.md) | Automatically log pushed commits by branch as detailed commit history | Tasks that add or maintain commit history automation |
-| detailed-chat-output | [detailed-chat-output/SKILL.md](detailed-chat-output/SKILL.md) | Keep output structure clear and complete | Multi-step or high-risk tasks that need clear traceability |
+| detailed-chat-output | [detailed-chat-output/SKILL.md](detailed-chat-output/SKILL.md) | Keep output structure clear and complete | Every task, before planning or edits |
 | self-improvement-loop | [self-improvement-loop/SKILL.md](self-improvement-loop/SKILL.md) | Improve instructions after mistakes or drift | Repeated errors, stale docs, or avoidable rework |
 | skill-improvement-loop | [skill-improvement-loop/SKILL.md](skill-improvement-loop/SKILL.md) | Summarize mistakes, evaluate skill effectiveness, and improve skills | Skill quality issues or missed auto-loading behavior |
 
@@ -66,13 +66,13 @@ skillMap:
   selectionOrder:
     - repo-workflow
     - scope-creep-guard
+    - detailed-chat-output
     - documentation-cohesion
     - manual-testing-guides
     - skill-map-governance
     - verification-gate
     - workflow-logging
     - remote-commit-logging
-    - detailed-chat-output
     - self-improvement-loop
     - skill-improvement-loop
   registry:

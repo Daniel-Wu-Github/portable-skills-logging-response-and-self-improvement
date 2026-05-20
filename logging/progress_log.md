@@ -32,3 +32,29 @@ Rules:
 ---
 
 <!-- Entries are appended below -->
+
+## Entry 001 - 2026-05-20 - Generalize verification loop
+
+- Task: Make the self-improvement loop language-agnostic, add GEMINI.md/context.md templates, and make detailed-chat-output always-on.
+- What the agent did: Added configurable verification checks with generic error logging, updated skills/instructions to make detailed-chat-output mandatory, and added new agent context templates.
+- How the agent did it: Edited scripts and config, aligned documentation and skill map guidance, and ran the smoke test.
+- Files edited:
+	- .claude/config
+	- .claude/debugging_log.md
+	- .claude/pending-improvements.md
+	- .github/copilot-instructions.md
+	- .github/skills/detailed-chat-output/SKILL.md
+	- .github/skills/SKILL_MAP.md
+	- CLAUDE.md
+	- README.md
+	- scripts/analyze-patterns.sh
+	- scripts/post-edit-check.sh
+	- scripts/session-end.sh
+	- GEMINI.md
+	- context.md
+	- logging/progress_log.md
+- Verification:
+	- `bash scripts/implicit-skill-smoke-test.sh`
+- Task alignment:
+	- Fulfillment: Language-agnostic checks now drive the loop, detailed-chat-output is mandatory across instructions, and Gemini/context templates are available.
+	- Deviation: None
